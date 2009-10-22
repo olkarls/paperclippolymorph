@@ -19,6 +19,19 @@ module LocusFocus
 
           has_many :attachings, :as => :attachable, :dependent => :destroy
           has_many :assets, :through => :attachings do
+            
+            def main_image
+              unless self.attachings.empty?
+                return self.attachings.select { |attaching| attaching.position == 1 }.first.asset
+              end
+              return nil
+            end
+
+            def additional_images
+              additional_images = self.attachings.select { |attaching| attaching.position != 1 }
+              return additional_images.sort_by { |attaching| attaching[:position] }
+            end
+
             def attach(asset_id)
               asset_id = extract_id(asset_id)
               asset = Asset.find(asset_id)
@@ -76,7 +89,8 @@ module LocusFocus
         end
         
         def create_and_save_asset(data_item)
-          the_asset = Asset.find_or_initialize_by_data_file_name(data_item.original_filename)
+          #the_asset = Asset.find_or_initialize_by_data_file_name(data_item.original_filename)
+          the_asset = Asset.initialize_by_data_file_name(data_item.original_filename)
           override_default_styles, normalised_styles = override_default_styles?(data_item.original_filename)
           the_asset.data.instance_variable_set("@styles", normalised_styles) if override_default_styles
           the_asset.data = data_item
@@ -86,7 +100,7 @@ module LocusFocus
             # cycle, which leads to needless DB calls. Now we'll clear out the data attribute
             # once the record is successfully saved any subsequent calls will be ignored.
             data_item = nil
-            Attaching.find_or_create_by_asset_id_and_attachable_type_and_attachable_id(:asset_id => the_asset.id, :attachable_type => self.class.to_s, :attachable_id => self.id)
+            Attaching.create_by_asset_id_and_attachable_type_and_attachable_id(:asset_id => the_asset.id, :attachable_type => self.class.to_s, :attachable_id => self.id)
             assets(true) # implicit reloading
           end
         end
